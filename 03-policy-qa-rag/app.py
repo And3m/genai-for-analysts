@@ -66,7 +66,8 @@ if user_query:
 
             with st.expander("Retrieved source chunks"):
                 for c in chunks:
-                    st.markdown(f"**{c['source']}** (chunk {c['chunk_index']})")
+                    score = f" | score {c['score']:.3f}" if c.get("score") is not None else ""
+                    st.markdown(f"**{c['source']}** (chunk {c['chunk_index']}{score})")
                     st.text(c["text"][:300] + "...")
 
     st.session_state.messages.append({"role": "assistant", "content": answer})

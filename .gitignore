@@ -15,9 +15,11 @@ build/
 
 # Data and indexes (too large for git)
 chroma_db/
+vector_store/
 faiss_index/
 *.faiss
 *.pkl
+*.npy
 *.db
 *.sqlite
 

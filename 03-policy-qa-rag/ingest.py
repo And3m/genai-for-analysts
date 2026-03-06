@@ -1,25 +1,24 @@
 """
-Document ingestion pipeline: load → chunk → embed → store in ChromaDB.
+Document ingestion pipeline: load → chunk → embed → store as numpy vectors.
 Run: python ingest.py --docs_dir ./sample_docs
 """
 
-import os
 import argparse
+import json
 import logging
+import pickle
 from pathlib import Path
 
-import chromadb
-from chromadb.utils import embedding_functions
-from dotenv import load_dotenv
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
-load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-CHROMA_PATH = "./chroma_db"
-COLLECTION_NAME = "policy_docs"
-CHUNK_SIZE = 500  # characters
+STORE_PATH = "./vector_store"
+CHUNK_SIZE = 500   # characters
 CHUNK_OVERLAP = 50
+MODEL_NAME = "all-MiniLM-L6-v2"
 
 
 def load_documents(docs_dir: str) -> list[dict]:
@@ -53,38 +52,33 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
 
 
 def ingest(docs_dir: str) -> None:
-    client = chromadb.PersistentClient(path=CHROMA_PATH)
+    store = Path(STORE_PATH)
+    store.mkdir(exist_ok=True)
 
-    ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="all-MiniLM-L6-v2"
-    )
-
-    # Delete existing collection to allow re-ingestion
-    try:
-        client.delete_collection(COLLECTION_NAME)
-        logger.info("Deleted existing collection '%s'", COLLECTION_NAME)
-    except Exception:
-        pass
-
-    collection = client.create_collection(COLLECTION_NAME, embedding_function=ef)
-
+    model = SentenceTransformer(MODEL_NAME)
     documents = load_documents(docs_dir)
-    ids, texts, metadatas = [], [], []
 
+    texts, metadatas = [], []
     for doc in documents:
         chunks = chunk_text(doc["text"])
         for i, chunk in enumerate(chunks):
-            chunk_id = f"{Path(doc['source']).stem}_chunk_{i}"
-            ids.append(chunk_id)
             texts.append(chunk)
             metadatas.append({"source": doc["source"], "chunk_index": i})
 
-    collection.add(documents=texts, ids=ids, metadatas=metadatas)
-    logger.info("Ingested %d chunks into ChromaDB at '%s'", len(ids), CHROMA_PATH)
+    logger.info("Embedding %d chunks...", len(texts))
+    embeddings = model.encode(texts, show_progress_bar=True, normalize_embeddings=True)
+
+    np.save(store / "embeddings.npy", embeddings)
+    with open(store / "texts.pkl", "wb") as f:
+        pickle.dump(texts, f)
+    with open(store / "metadatas.json", "w") as f:
+        json.dump(metadatas, f)
+
+    logger.info("Saved %d chunks to '%s'", len(texts), STORE_PATH)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Ingest documents into ChromaDB")
+    parser = argparse.ArgumentParser(description="Ingest documents into numpy vector store")
     parser.add_argument("--docs_dir", default="./sample_docs", help="Directory containing documents")
     args = parser.parse_args()
     ingest(args.docs_dir)

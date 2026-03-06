@@ -1,39 +1,53 @@
 """
-Retrieval module: query ChromaDB and return relevant chunks with sources.
+Retrieval module: embed query, cosine-similarity search over numpy vector store.
 """
 
-import os
-import chromadb
-from chromadb.utils import embedding_functions
+import json
+import pickle
+from pathlib import Path
 
-CHROMA_PATH = "./chroma_db"
-COLLECTION_NAME = "policy_docs"
+import numpy as np
+from sentence_transformers import SentenceTransformer
+
+STORE_PATH = "./vector_store"
 TOP_K = 5
+MODEL_NAME = "all-MiniLM-L6-v2"
+
+_model = None
+_store = None
 
 
-def get_collection():
-    client = chromadb.PersistentClient(path=CHROMA_PATH)
-    ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="all-MiniLM-L6-v2"
-    )
-    return client.get_collection(COLLECTION_NAME, embedding_function=ef)
+def _load_store():
+    global _model, _store
+    if _store is None:
+        store = Path(STORE_PATH)
+        embeddings = np.load(store / "embeddings.npy")
+        with open(store / "texts.pkl", "rb") as f:
+            texts = pickle.load(f)
+        with open(store / "metadatas.json") as f:
+            metadatas = json.load(f)
+        _store = {"embeddings": embeddings, "texts": texts, "metadatas": metadatas}
+    if _model is None:
+        _model = SentenceTransformer(MODEL_NAME)
+    return _model, _store
 
 
 def retrieve(query: str, top_k: int = TOP_K) -> list[dict]:
     """
-    Retrieve the top_k most relevant chunks for a query.
-
-    Returns a list of dicts with keys: text, source, chunk_index, distance.
+    Retrieve the top_k most relevant chunks for a query using cosine similarity.
+    Returns a list of dicts with keys: text, source, chunk_index, score.
     """
-    collection = get_collection()
-    results = collection.query(query_texts=[query], n_results=top_k)
+    model, store = _load_store()
+    query_vec = model.encode([query], normalize_embeddings=True)[0]
+    scores = store["embeddings"] @ query_vec   # dot product == cosine sim (normalized)
+    top_indices = np.argsort(scores)[::-1][:top_k]
 
-    chunks = []
-    for i in range(len(results["documents"][0])):
-        chunks.append({
-            "text": results["documents"][0][i],
-            "source": results["metadatas"][0][i].get("source", "unknown"),
-            "chunk_index": results["metadatas"][0][i].get("chunk_index", i),
-            "distance": results["distances"][0][i] if results.get("distances") else None,
-        })
-    return chunks
+    return [
+        {
+            "text": store["texts"][i],
+            "source": store["metadatas"][i].get("source", "unknown"),
+            "chunk_index": store["metadatas"][i].get("chunk_index", i),
+            "score": float(scores[i]),
+        }
+        for i in top_indices
+    ]
