@@ -1,0 +1,37 @@
+You are reviewing the following dataset statistics. Write a business narrative based on these numbers.
+
+## Dataset Overview
+- Rows: {{ stats.row_count }}
+- Columns: {{ stats.column_count }}
+{% if stats.date_column %}- Time dimension: {{ stats.date_column }}{% endif %}
+
+## Numeric Metrics (across full dataset)
+{% for col, s in stats.numeric_summary.items() %}
+### {{ col }}
+- Total: {{ s.total }} | Mean: {{ s.mean }} | Min: {{ s.min }} | Max: {{ s.max }}
+{% if s.pct_change_total is defined %}
+- Trend ({{ stats.date_column }}): {{ s.first_value }} → {{ s.last_value }} ({{ s.pct_change_total }}% change over the period)
+{% endif %}
+{% endfor %}
+
+{% if stats.grouped_summary %}
+## Breakdown by {{ stats.grouped_summary.group_by }} (totals)
+{% for group, metrics in stats.grouped_summary.data.items() %}
+**{{ group }}:** {% for metric, val in metrics.items() %}{{ metric }}: {{ val }}{% if not loop.last %} | {% endif %}{% endfor %}
+{% endfor %}
+{% endif %}
+
+## Key Categories
+{% for col, s in stats.categorical_summary.items() %}
+### {{ col }} ({{ s.unique_count }} unique values)
+Top values: {% for val, count in s.top_values.items() %}{{ val }} ({{ count }} rows){% if not loop.last %}, {% endif %}{% endfor %}
+{% endfor %}
+
+---
+
+Tone: {{ tone }}
+Target length: approximately {{ max_words }} words.
+
+Write the narrative now. Synthesise the numbers into business insights — do not list the raw figures.
+Highlight the most meaningful trend, the strongest performer, and any notable gap or risk.
+Use specific numbers to support your points.

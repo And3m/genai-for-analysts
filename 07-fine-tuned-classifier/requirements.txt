@@ -1,0 +1,10 @@
+transformers>=4.40.0
+datasets>=2.20.0
+peft>=0.10.0
+torch>=2.2.0
+scikit-learn>=1.4.0
+pandas>=2.0.0
+anthropic>=0.40.0
+python-dotenv>=1.0.0
+# Uncomment for experiment tracking:
+# wandb>=0.17.0

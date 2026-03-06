@@ -1,0 +1,50 @@
+# Environment
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Data and indexes (too large for git)
+chroma_db/
+faiss_index/
+*.faiss
+*.pkl
+*.db
+*.sqlite
+
+# Model outputs (large files)
+model_output/
+processed_data/
+*.bin
+*.safetensors
+*.pt
+*.pth
+
+# Logs
+*.log
+wandb/
+runs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Export artifacts (regenerated)
+invoices_export.xlsx
+report_narrative.txt
+research_brief.md
+evaluation_results.csv
+results.csv
